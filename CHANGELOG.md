@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- `AiCredits.oneTime` (AI status): true on the Free plan, whose AI credits are
+  given once and don't renew at `periodEnd`.
+
 ## 0.1.0
 
 The first release.

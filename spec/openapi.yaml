@@ -267,7 +267,7 @@ info:
     organization admin has capped this workspace's share).
 
     AI features spend **AI credits**, a separate pool per billing period
-    with its own price list (for example 5 per AI image, 1 per 500
+    (on the Free plan, a one-time 50 that doesn't renew) with its own price list (for example 5 per AI image, 1 per 500
     characters of voiceover, 10 per second of AI video at 720p); a failed AI call
     is refunded. `GET /ai/status` shows the price list and what is left;
     an exhausted pool answers `402 AI_CREDITS_EXCEEDED`.
@@ -496,7 +496,8 @@ tags:
       (504), `AI_RATE_LIMITED` (429), `AI_BAD_OUTPUT` (502),
       `AI_BAD_REQUEST` (422), `AI_UPSTREAM_ERROR` (502) and
       `AI_CREDITS_EXCEEDED` (402). `POST /designs/generate` designs a new
-      template with the design agent (15–30 AI credits).
+      template with the design agent (15–30 AI credits, up to 12 more for
+      each carousel page after the first).
       `POST /images/remove-background` cuts a picture out on a transparent
       background (1 AI credit) and `POST /ai/transcribe` turns speech into
       subtitle cues for `modifications.subtitles` (1 AI credit a minute).
@@ -2476,6 +2477,7 @@ paths:
                   periodStart: '2026-11-01T00:00:00.000Z'
                   periodEnd: '2026-12-01T00:00:00.000Z'
                   active: true
+                  oneTime: false
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '429': { $ref: '#/components/responses/RateLimited' }
@@ -3843,7 +3845,7 @@ components:
         credits:
           type: object
           description: The organization's AI credits for the current billing period.
-          required: [planCode, used, reserved, limit, remaining, periodStart, periodEnd, active]
+          required: [planCode, used, reserved, limit, remaining, periodStart, periodEnd, active, oneTime]
           properties:
             planCode: { type: string }
             used:
@@ -3863,6 +3865,11 @@ components:
             active:
               type: boolean
               description: False when the subscription isn't active (AI credits can't be spent).
+            oneTime:
+              type: boolean
+              description: >-
+                True on the Free plan: its AI credits are given once and don't
+                renew at `periodEnd`; `used` counts every credit spent on Free.
 
     Pagination:
       type: object

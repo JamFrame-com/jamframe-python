@@ -903,7 +903,11 @@ class AiPrice(TypedDict):
 
 
 class AiCredits(TypedDict):
-    """The organization's AI credits this billing period (``None``: unlimited)."""
+    """The organization's AI credits this billing period (``None``: unlimited).
+
+    ``oneTime`` is true on the Free plan: its credits are given once and don't
+    renew at ``periodEnd``.
+    """
 
     planCode: str
     used: int
@@ -913,6 +917,7 @@ class AiCredits(TypedDict):
     periodStart: str
     periodEnd: str
     active: bool
+    oneTime: bool
 
 
 class AiStatus(TypedDict):
