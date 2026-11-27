@@ -53,11 +53,20 @@ info:
       signed when they are sent.
     - `GET /renders` and `GET /renders/{id}` answer fresh links that work
       for 5 minutes.
-    - Files are deleted **8 days** after the render, so a link never
-      outlives its file.
-    - **Need a permanent link?** Use a Dynamic URL (below): it renders the
-      image when it is opened, serves it from the render cache afterwards,
-      and works for as long as you keep it on.
+    - Files are kept for as long as your organization's **Data retention**
+      setting says: **90 days** by default. It can be 1, 8, 30, 90 or 365
+      days, or until you delete them, up to your plan's limit. Files
+      usually outlive their links: while a file is kept,
+      `GET /renders/{id}` gives you a fresh link to it.
+    - Once a render's files are deleted, no more links are made to them:
+      in the render log `outputs` is empty and `filesDeleted` is `true`,
+      and a render job's `result` has empty `content` and `urls`. A link
+      made before may still open the CDN's cached copy until it expires.
+    - **Need a permanent link?** On a paid plan, files kept longer than 8
+      days (the default 90 days included) come with `permanentUrls`: links
+      that don't expire while the file is kept. Or use a Dynamic URL
+      (below): it renders the image when it is opened, serves it from the
+      render cache afterwards, and works for as long as you keep it on.
 
     ## Signed and dynamic URLs
 
@@ -602,8 +611,10 @@ paths:
         With `response.type: "url"` (the default) each file is stored and
         `content` holds links to the files that work for `expiresIn`
         seconds (default 300, at most 604800 = 7 days); `expiresAt` says
-        until when. The files are deleted 8 days after the render: for a
-        permanent image link, use a Dynamic URL. With `"base64"` nothing is
+        until when. The files are kept as your organization's Data
+        retention setting says (90 days by default). For a link that
+        doesn't expire, use `permanentUrls` (paid plans) or a Dynamic URL.
+        With `"base64"` nothing is
         stored and `content` holds the raw base64 bytes (no `data:`
         prefix); base64 is only available for synchronous image and PDF
         renders, and takes no `expiresIn`.
@@ -943,7 +954,7 @@ paths:
                   summary: A link time over 7 days
                   value:
                     error: VALIDATION_ERROR
-                    message: 'expiresIn is how long the file links work, in whole seconds: from 1 to 604800 (7 days), default 300. For a link that never expires, use a Dynamic URL.'
+                    message: 'expiresIn is how long the file links work, in whole seconds: from 1 to 604800 (7 days), default 300. For a link that never expires, use a permanent link (paid plans, files kept longer than 8 days) or a Dynamic URL.'
                     detail: { field: expiresIn, min: 1, max: 604800, default: 300 }
                 badWebhookUrl:
                   value:
@@ -1031,8 +1042,10 @@ paths:
 
         Every read answers fresh file links that work for the request's
         `expiresIn` (default 300 seconds) from then, until `expiresAt`, for
-        as long as the files exist: they are deleted 8 days after the
-        render.
+        as long as the files are kept: the organization's Data retention
+        setting says how long (90 days by default). Once they are deleted,
+        a succeeded job's `result` has empty `content` and `urls`, and no
+        `expiresAt`, `subtitles` or `permanentUrls`.
 
         While a video renders, `progress` goes from 0 to 1 (frames
         captured out of the total).
@@ -1127,8 +1140,10 @@ paths:
         they cost no credits.
 
         Each item lists its stored files in `outputs`, as fresh links that
-        work for 5 minutes (`expiresAt`). Files are deleted 8 days after the
-        render, so links to older renders no longer work. Renders requested
+        work for 5 minutes (`expiresAt`). Files are kept as the
+        organization's Data retention setting says (90 days by default;
+        `filesExpireAt`). Once they are deleted, `outputs` is empty and
+        `filesDeleted` is `true`. Renders requested
         with `response.type: "base64"` stored nothing, so their `outputs`
         is empty.
 
@@ -1184,6 +1199,8 @@ paths:
                             expiresAt: '2026-11-09T09:05:00.000Z'
                         error: null
                         cached: false
+                        filesExpireAt: '2027-02-06T14:21:05.000Z'
+                        filesDeleted: false
                       - id: clx8n0q1r0006abcd1234efgh
                         createdAt: '2026-11-08T14:20:58.000Z'
                         designId: clx8m2k3p0001abcd1234efgh
@@ -1200,6 +1217,8 @@ paths:
                             expiresAt: '2026-11-09T09:05:00.000Z'
                         error: null
                         cached: true
+                        filesExpireAt: '2026-12-09T14:20:58.000Z'
+                        filesDeleted: false
                       - id: clx8n0q1r0004abcd1234efgh
                         createdAt: '2026-11-08T14:20:41.000Z'
                         designId: null
@@ -1213,6 +1232,8 @@ paths:
                         outputs: []
                         error: 'Navigation timeout of 30000 ms exceeded'
                         cached: false
+                        filesExpireAt: null
+                        filesDeleted: false
                     pagination:
                       nextCursor: clx8n0q1r0004abcd1234efgh
                       hasMore: true
@@ -1238,7 +1259,9 @@ paths:
         lists: its status, credits, and stored files in `outputs` (fresh
         links that work for 5 minutes). Use it to look up a `renderId` from
         a render response, a render job's `result`, or a `render.completed`
-        webhook.
+        webhook, and to get a fresh link to a file while it is kept. Once
+        the files are deleted, `outputs` is empty and `filesDeleted` is
+        `true`.
 
         Returns `404 NOT_FOUND` when no render has this id in the key's
         workspace.
@@ -1281,6 +1304,8 @@ paths:
                           expiresAt: '2026-11-09T09:05:00.000Z'
                       error: null
                       cached: false
+                      filesExpireAt: '2027-02-06T14:21:05.000Z'
+                      filesDeleted: false
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404':
@@ -1291,6 +1316,46 @@ paths:
               example:
                 error: NOT_FOUND
                 message: Render clx8n0q1r0005abcd1234efgh not found in this workspace
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /renders/{id}/files:
+    delete:
+      tags: [Render]
+      operationId: deleteRenderFiles
+      summary: Delete a render's files
+      description: |
+        Deletes the render's stored files now, instead of waiting for
+        `filesExpireAt`. The render stays in the log with its status and
+        credits; `outputs` becomes empty and `filesDeleted` true. No new
+        links are made to the files (a link handed out before may still
+        open the CDN's cached copy until it expires), and a signed or
+        dynamic URL renders again on its next request.
+
+        Deleting files that are already gone does nothing. Returns
+        `404 NOT_FOUND` when no render has this id in the key's workspace.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          description: The render id (`renderId` in a render response).
+          schema: { type: string, maxLength: 64 }
+      responses:
+        '200':
+          description: The render, with its files deleted.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [render]
+                properties:
+                  render: { $ref: '#/components/schemas/RenderItem' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: No render with this id in the API key's workspace.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
         '429': { $ref: '#/components/responses/RateLimited' }
 
   /signed-urls:
@@ -1305,7 +1370,9 @@ paths:
         works as an `<img src>`, in emails and as an `og:image`. Later
         requests for the same URL are served from the render cache for
         `cacheSeconds` (default 30 days) at no cost, as long as the
-        template hasn't been saved since.
+        template hasn't been saved since and the file is still kept (the
+        organization's Data retention setting, at most 31 days for these
+        renders).
 
         The request is validated as a render would be: an unknown template
         is a `404`, an invalid modification a `400`; keys that match
@@ -2647,7 +2714,9 @@ paths:
         credential. A query string is ignored.
 
         Cache: within the URL's cache time, the same request is served from
-        the stored file for free, and `If-None-Match` with the `ETag`
+        the stored file for free while the file is kept (a short Data
+        retention setting means it renders again sooner), and
+        `If-None-Match` with the `ETag`
         answers `304`. `X-Render-Cache` says `HIT` or `MISS`.
         `Cache-Control: max-age` is the cache time but at most one day, so a
         key rotation reaches browsers and CDNs within a day.
@@ -2703,7 +2772,9 @@ paths:
         time (default 300 seconds) the same parameters are served from the
         stored file: free, not counted toward the cap, and still served
         once the cap is reached. Parameters that match nothing in the
-        template don't change the cache key.
+        template don't change the cache key. The stored file is reused only
+        while it is kept: a Data retention setting shorter than the cache
+        time means the next request renders again sooner.
 
         When the cap is reached (`402 CREDIT_CAP_REACHED`, for parameters
         not in the cache), the URL is turned off (`410 URL_DISABLED`) or
@@ -2930,7 +3001,9 @@ paths:
         `url` / `downloadUrl` (render response). Shown inline; with
         `download=1`, as an attachment named after the form. Handles are
         opaque, made afresh for each response and only valid on this form.
-        Files are deleted 7 days after the render (`410 FILE_EXPIRED`).
+        Files are kept as the form owner's organization says (its form
+        results setting, 7 days by default); after that the handle answers
+        `410 FILE_EXPIRED`.
       parameters:
         - $ref: '#/components/parameters/FormPublicId'
         - in: path
@@ -4411,8 +4484,10 @@ components:
             minutes by default, at most 7 days (`expiresAt` says until
             when). A render job keeps it: each `GET /render-jobs/{id}`, and
             each webhook, carries fresh links that work this long. Files are
-            deleted 8 days after the render. For a permanent image link, use
-            a Dynamic URL. Not with `response.type: "base64"`.
+            kept as the organization's Data retention setting says (90 days
+            by default); `GET /renders/{id}` gives a fresh link while they
+            are. For a link that doesn't expire, use `permanentUrls` (paid
+            plans) or a Dynamic URL. Not with `response.type: "base64"`.
           example: 3600
         translate:
           type: boolean
@@ -4686,12 +4761,24 @@ components:
             Templates with AI layers, or `translate`: AI credits charged for
             this render (once for every size, page and frame), 0 when every
             result came from the cache. Omitted for renders without AI.
+        permanentUrls:
+          type: array
+          items: { type: string, format: uri }
+          description: |
+            Only on a paid plan, when your organization keeps rendered files
+            longer than 8 days (its Data retention setting; the default 90
+            days does): one link per file, in the
+            order of `urls`, that works for as long as the file is kept.
+            Unlike `content`, these links don't expire: paste them into a
+            website, an email or a spreadsheet. Each one redirects to a
+            fresh signed link (`https://api.jamframe.com/file/<token>.<ext>`)
+            and answers `404` once the file is deleted.
 
     RenderItem:
       type: object
       description: One render from the workspace's render log.
       required:
-        [id, createdAt, designId, designName, source, format, pages, credits, status, durationMs, outputs, error, cached]
+        [id, createdAt, designId, designName, source, format, pages, credits, status, durationMs, outputs, error, cached, filesExpireAt, filesDeleted]
       properties:
         id:
           type: string
@@ -4740,14 +4827,32 @@ components:
           description: |
             The stored files, in page order: one per page for images, one
             for a PDF or an MP4. Empty for failed renders and for `base64`
-            renders, which store nothing. Each read answers fresh links;
-            files are deleted 8 days after the render (31 for signed and
-            dynamic URLs).
+            renders, which store nothing, and once the files are deleted.
+            Each read answers fresh links. How long the files are kept is in
+            `filesExpireAt`.
           items: { $ref: '#/components/schemas/RenderOutputFile' }
         error:
           type: [string, 'null']
           maxLength: 300
           description: Why a failed render failed (shortened to 300 characters). `null` otherwise.
+        filesExpireAt:
+          type: [string, 'null']
+          format: date-time
+          description: |
+            When the stored files are deleted, as the organization's Data
+            retention setting says (up to its plan's limit): 90 days after
+            the render by default, and a workspace may have its own setting.
+            Signed and dynamic URL renders follow it up to 31 days. Form
+            results follow the organization's form results setting (7 days
+            by default). `null` when the files are kept until you delete
+            them, or nothing was stored.
+        filesDeleted:
+          type: boolean
+          description: |
+            The files are gone: past `filesExpireAt`, or deleted with
+            `DELETE /renders/{id}/files`. `outputs` is then empty, since no
+            more links are made to deleted files. The render stays in the
+            log.
 
     SignedUrlRequest:
       type: object
@@ -4808,7 +4913,9 @@ components:
             How long a render of this URL is reused (default and most 30
             days, since its file is deleted after 31; 0 renders every
             request). URLs signed with a longer time before reuse it for 30
-            days.
+            days. When the organization's Data retention setting keeps files
+            for less time, a render is reused only while its file is kept,
+            so the URL renders again sooner (and costs credits again).
 
     SignedUrlResponse:
       type: object
@@ -5030,6 +5137,14 @@ components:
           type: string
           format: date-time
           description: When `url` stops working (5 minutes after the read).
+        permanentUrl:
+          type: string
+          format: uri
+          description: |
+            Only on a paid plan, for files your organization keeps longer
+            than 8 days (Data retention), and never for signed or dynamic
+            URL renders or form results: a link that works for as long as
+            the file is kept. See `permanentUrls` in a render response.
 
     RenderTotals:
       type: object
@@ -5597,10 +5712,12 @@ components:
             `google_sheets` (`url`, `sheet`?, `connectionId`? for a private
             sheet), `file_url` (`url` of a CSV or XLSX file, `format`
             auto/csv/xlsx, `sheet`?), `airtable` (`baseId`, `table`,
-            `view`?, `token`), `drive_folder` (`folder`, `connectionId`) or
+            `view`?, `token`), `notion` (`database`: the database's link
+            or id, `dataSourceId`?, `connectionId` of a Notion connection
+            made in the app), `drive_folder` (`folder`, `connectionId`) or
             `webhook` (the incoming webhook's payload).
           properties:
-            kind: { type: string, enum: [google_sheets, file_url, airtable, drive_folder, webhook] }
+            kind: { type: string, enum: [google_sheets, file_url, airtable, notion, drive_folder, webhook] }
             url: { type: string, maxLength: 2048 }
             sheet: { type: string, maxLength: 200 }
             format: { type: string, enum: [auto, csv, xlsx] }
@@ -5612,6 +5729,8 @@ components:
               oneOf:
                 - { type: string, maxLength: 1000 }
                 - $ref: '#/components/schemas/WorkflowSecret'
+            database: { type: string, maxLength: 2048, description: 'A Notion database''s link or id (`notion`).' }
+            dataSourceId: { type: string, maxLength: 64, description: 'One of the Notion database''s data sources; default the first (`notion`).' }
             folder: { type: string, maxLength: 2048 }
             connectionId: { type: string, maxLength: 64 }
         transforms:
@@ -5661,7 +5780,10 @@ components:
               `workflow.row.rendered`); `slack` (`webhookUrl`, `message`?);
               `social` (`accountIds`, `caption`?, `when`: now/schedule/draft,
               `scheduledAt`?, `timezone`?); `sheets_writeback` (`column`,
-              `connectionId`); `drive_upload` (`folder`: a folder name this
+              `connectionId`); `notion_update` (`property`: a Files & media
+              property gets the rendered file, a URL or text property its
+              link; `setProperty`? and `setValue`? set one more property,
+              such as Status; needs a `notion` source); `drive_upload` (`folder`: a folder name this
               app creates in My Drive, or a link to one it created;
               `connectionId`); `s3_upload` (`provider`?: `aws` (default)
               or `r2`; `bucket`; `region` for S3; `accountId` and
@@ -5671,7 +5793,7 @@ components:
               `{{run.date}}` placeholders; default `renders/{{render.id}}`;
               the extension is added).
             properties:
-              kind: { type: string, enum: [url, webhook, slack, social, sheets_writeback, drive_upload, s3_upload] }
+              kind: { type: string, enum: [url, webhook, slack, social, sheets_writeback, notion_update, drive_upload, s3_upload] }
               url: { type: string, maxLength: 2048 }
               webhookUrl:
                 description: Write-only Slack incoming webhook URL.
@@ -5700,6 +5822,9 @@ components:
               scheduledAt: { type: string, maxLength: 200 }
               timezone: { type: string, maxLength: 64 }
               column: { type: string, maxLength: 200 }
+              property: { type: string, maxLength: 200, description: 'The Notion property that gets the render (`notion_update`).' }
+              setProperty: { type: string, maxLength: 200, description: 'One more Notion property to set (`notion_update`).' }
+              setValue: { type: string, maxLength: 500, description: 'Its value, with `{{Column}}` placeholders; empty ticks a checkbox (`notion_update`).' }
               folder: { type: string, maxLength: 2048 }
               connectionId: { type: string, maxLength: 64 }
     WorkflowSecret:
@@ -5823,7 +5948,9 @@ components:
           items: { type: string, format: uri }
           description: |
             The row's rendered files, as fresh links on every read that work
-            for an hour. Files are deleted 8 days after the render.
+            for an hour. Files are kept as the organization's Data retention
+            setting says (90 days by default); `GET /renders/{id}` with the
+            `renderId` says whether they still are.
         credits: { type: integer }
         deliveries:
           type: array
@@ -5947,7 +6074,7 @@ components:
         | 404 | `NOT_FOUND` | No such form, or its template was deleted, or not a file handle of this form. |
         | 410 | `FORM_DISABLED` | The owner turned the form off. |
         | 410 | `FORM_EXPIRED` | The form's expiry has passed. |
-        | 410 | `FILE_EXPIRED` | The result file was deleted (7 days after the render). |
+        | 410 | `FILE_EXPIRED` | The result file was deleted (the owner's form results setting, 7 days by default). |
         | 413 | `UPLOAD_TOO_LARGE` | The upload is over 10 MB. |
         | 413 | `BODY_TOO_LARGE` | The JSON body is over 256 kB. |
         | 415 | `UNSUPPORTED_MEDIA_TYPE` | The body uses an unsupported charset or encoding. |

@@ -4,6 +4,14 @@
 
 - `AiCredits.oneTime` (AI status): true on the Free plan, whose AI credits are
   given once and don't renew at `periodEnd`.
+- Data retention: `renders.delete_files(render_id)` deletes a render's stored
+  files now (`DELETE /renders/{id}/files`). The render log's items have
+  `filesExpireAt` (when the files are deleted, 90 days by default) and
+  `filesDeleted`. On paid plans that keep files longer than 8 days, renders
+  have `permanentUrls` and log files a `permanentUrl`: links that work for as
+  long as the file is kept.
+- Workflows: a `notion` source (rows from a Notion database) and a
+  `notion_update` step that writes each render back to its Notion row.
 
 ## 0.1.0
 

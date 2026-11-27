@@ -187,6 +187,10 @@ for render in client.renders.iter(design_id="tpl_id"):
 # One render by id (the `renderId` of a render, or of a job's `result`).
 render = client.renders.get(result["data"]["renderId"])
 render["status"], render["credits"], render["outputs"]
+render["filesExpireAt"]   # when the files are deleted (Data retention, 90 days by default)
+
+# Delete the files now. The render stays in the log, with filesDeleted True.
+client.renders.delete_files(render["id"])
 ```
 
 ## Signed URLs

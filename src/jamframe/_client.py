@@ -498,11 +498,16 @@ class DesignJobs(_Resource):
 
 
 class Renders(_Resource):
-    """The render log (``GET /renders``, ``GET /renders/{id}``)."""
+    """The render log (``GET /renders``, ``GET /renders/{id}``, ``DELETE /renders/{id}/files``)."""
 
     def get(self, render_id: str) -> RenderItem:
         """One render by id (a ``renderId`` from a render or a job's result), as the log lists it."""
         result = self._client._request("GET", f"/renders/{path_segment(render_id)}")
+        return cast(RenderItem, unwrap(result, "render"))
+
+    def delete_files(self, render_id: str) -> RenderItem:
+        """Delete the render's stored files now. The render stays in the log, with ``filesDeleted`` true."""
+        result = self._client._request("DELETE", f"/renders/{path_segment(render_id)}/files")
         return cast(RenderItem, unwrap(result, "render"))
 
     def list(

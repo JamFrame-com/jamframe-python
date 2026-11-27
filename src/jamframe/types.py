@@ -368,12 +368,15 @@ class RenderResult(_RenderResultRequired, total=False):
     """The ``data`` of a render, and a succeeded render job's ``result``.
 
     ``url`` renders also carry ``urls`` (every file's link in one list) and
-    ``expiresAt`` (when the links stop working). ``aiCredits``: AI credits
-    for AI layers or ``translate`` (0 when cached).
+    ``expiresAt`` (when the links stop working). ``permanentUrls``: on paid
+    plans that keep files longer than 8 days, one link per file (in the order
+    of ``urls``) that works for as long as the file is kept. ``aiCredits``: AI
+    credits for AI layers or ``translate`` (0 when cached).
     """
 
     urls: List[str]
     expiresAt: str
+    permanentUrls: List[str]
     duration: float
     subtitles: str
     aiCredits: int
@@ -425,13 +428,23 @@ class _RenderOutputFileRequired(TypedDict):
 
 
 class RenderOutputFile(_RenderOutputFileRequired, total=False):
-    """A stored file of the render log. ``url`` works until ``expiresAt`` (5 minutes)."""
+    """A stored file of the render log. ``url`` works until ``expiresAt`` (5 minutes).
+
+    ``permanentUrl``: on paid plans that keep files longer than 8 days, a link
+    that works for as long as the file is kept.
+    """
 
     expiresAt: str
+    permanentUrl: str
 
 
 class RenderItem(TypedDict):
-    """One row of the render log (``GET /renders``)."""
+    """One row of the render log (``GET /renders``).
+
+    ``filesExpireAt``: when the stored files are deleted (the Data retention
+    setting), ``None`` when they are kept until you delete them.
+    ``filesDeleted``: the files are gone, and ``outputs`` is empty.
+    """
 
     id: str
     createdAt: str
@@ -446,6 +459,8 @@ class RenderItem(TypedDict):
     outputs: List[RenderOutputFile]
     error: Optional[str]
     cached: bool
+    filesExpireAt: Optional[str]
+    filesDeleted: bool
 
 
 class RenderTotals(TypedDict):

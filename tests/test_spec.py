@@ -260,6 +260,7 @@ CALLS: Dict[str, Callable[[Client], Any]] = {
     "GET /render-jobs/{id}": lambda c: c.render_jobs.get("j"),
     "GET /renders": lambda c: c.renders.list(),
     "GET /renders/{id}": lambda c: c.renders.get("r"),
+    "DELETE /renders/{id}/files": lambda c: c.renders.delete_files("r"),
     "POST /signed-urls": lambda c: c.signed_urls.create("t"),
     "POST /signed-urls/rotate-key": lambda c: c.signed_urls.rotate_key(),
     "GET /designs": lambda c: c.designs.list(),
